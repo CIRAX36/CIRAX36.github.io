@@ -1,0 +1,438 @@
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SIGEC - SISTEMA INTEGRAL DE GEOLOCALIZACIÓN CRIMINAL</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="shortcut icon" href="GIF LOGO.gif" type="image/x-icon" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #ecbaf8ff;
+      color: #333;
+    }
+    /* Preloader */
+    #preloader {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #preloader img {
+      width: 120px;
+      height: auto;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 0.8; }
+    }
+    header {
+      background: #76dfff;
+      color: rgb(0, 0, 0);
+      padding: 1rem;
+    }
+    header .encabezado {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    header img {
+      height: 100px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      text-align: center;
+    }
+    #posicion-container {
+      width: 750px;
+      margin: 1rem auto;
+      text-align: center;
+    }
+    a {
+      color: #000000ff;
+    }
+    #map {
+      height: 70vh;
+      border-bottom: 2px solid #ccc;
+    }
+    #formulario {
+      padding: 1rem 1.5rem;
+      background: #f4f4f4;
+      max-width: 600px;
+      margin: 0 auto 2rem auto;
+    }
+    label {
+      margin-top: 0.8rem;
+      display: block;
+      font-weight: bold;
+    }
+    input, select, button {
+      width: 100%;
+      max-width: 600px;
+      padding: 0.5rem;
+      margin-top: 0.3rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 1rem;
+      background-color: #004080;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #002d59;
+    }
+    #borrarBtn {
+      background-color: #b40000;
+      margin-top: 1rem;
+      max-width: 600px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #borrarBtn:hover {
+      background-color: #800000;
+    }
+    #toggleSeguimiento {
+      display: block;
+      width: 180px;
+      margin: 1rem auto;
+      background-color: #228b22;
+    }
+    #toggleSeguimiento.seguimiento-activo {
+      background-color: #b36b00;
+    }
+    ul#listaDelitos {
+      max-width: 600px;
+      margin: 1rem auto;
+      padding-left: 1rem;
+    }
+    ul#listaDelitos li {
+      background: rgb(153, 225, 235);
+      margin-bottom: 1rem;
+      padding: 0.8rem 1rem;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    small {
+      color: #666;
+    }
+    @media (max-width: 650px) {
+      #formulario, ul#listaDelitos {
+        padding: 0 1rem;
+        max-width: 100%;
+      }
+      #posicion-container {
+        width: 100%;
+        padding: 0 1rem;
+      }
+    }
+    .leaflet-control-attribution {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <img src="LOGO2.png" alt="Cargando SIGEC..." />
+</div>
+
+<header>
+  <div class="encabezado">
+    <a href="GIF LOGO.gif" class="logo">
+      <img src="LOGO2.png" alt="Ir al logo principal" style="height: 80px;" />
+    </a>
+    <h1>SIGEC - SISTEMA INTEGRAL DE GEOLOCALIZACIÓN CRIMINAL</h1>
+  </div>
+</header>
+
+<div id="posicion-container">
+  <p>Tu posición es: <span id="Pos">Desconocida</span></p>
+  <p id="PosLink"><a target="_blank" href="#"></a></p>
+</div>
+
+<div id="map"></div>
+
+<button id="toggleSeguimiento" onclick="toggleSeguimiento()">🔵 Activar seguimiento</button>
+
+<section id="formulario">
+  <h2>Registrar Delito</h2>
+  <form id="crimeForm" autocomplete="off">
+    <label for="nombre">Nombre completo:</label>
+    <input type="text" id="nombre" required placeholder="Ejemplo: Juan Pérez" />
+
+    <label for="edad">Edad:</label>
+    <input type="number" id="edad" min="1" max="120" required placeholder="Ejemplo: 30" />
+
+    <label for="sexo">Sexo:</label>
+    <select id="sexo" required>
+      <option value="" disabled selected>Selecciona</option>
+      <option value="Masculino">Masculino</option>
+      <option value="Femenino">Femenino</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+    <label for="tipo">Tipo de delito:</label>
+    <select id="tipo" required onchange="mostrarOtroDelito(this.value)">
+      <option value="" disabled selected>Selecciona un delito</option>
+      <option value="Robo">Robo</option>
+      <option value="Asalto">Asalto</option>
+      <option value="Homicidio">Homicidio</option>
+      <option value="Secuestro">Secuestro</option>
+      <option value="Violación">Violación</option>
+      <option value="Extorsión">Extorsión</option>
+      <option value="Narcotráfico">Narcotráfico</option>
+      <option value="Fraude">Fraude</option>
+      <option value="Violencia familiar">Violencia familiar</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+    <div id="otroDelitoContainer" style="display:none; margin-top:0.5rem;">
+      <label for="otroDelito">Especificar otro delito:</label>
+      <input type="text" id="otroDelito" placeholder="Describe el delito" />
+    </div>
+
+    <label for="descripcion">Descripción:</label>
+    <input type="text" id="descripcion" required placeholder="Ej. Robo con violencia en zona centro" />
+
+    <input type="hidden" id="lat" />
+    <input type="hidden" id="lng" />
+
+    <button type="submit">Registrar Delito</button>
+  </form>
+
+  <p><strong>Nota:</strong> Haz clic en el mapa para seleccionar la ubicación del delito.</p>
+  <button id="borrarBtn" onclick="limpiarDelitos()">🗑️ Borrar todos los delitos</button>
+
+  <h3>Delitos registrados:</h3>
+  <ul id="listaDelitos"></ul>
+</section>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  let map, userMarker, selectedMarker;
+  let delitos = [];
+  let seguimientoActivo = false;
+  let watchId = null;
+
+  const posElt = document.getElementById('Pos');
+  const posLinkElt = document.querySelector('#PosLink > a');
+
+  try {
+    delitos = JSON.parse(localStorage.getItem("delitos")) || [];
+  } catch(e) {
+    console.error("Error cargando delitos desde localStorage", e);
+  }
+
+  function actualizarPosicion(lat, lng) {
+    posElt.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    posLinkElt.href = `https://maps.google.com/?q=${lat},${lng}`;
+    posLinkElt.textContent = 'Mostrar tu posición en un mapa';
+  }
+
+  function iniciarMapa(lat, lng) {
+    map = L.map("map", { attributionControl: false }).setView([lat, lng], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+
+    userMarker = L.marker([lat, lng], {title: "Tu ubicación"}).addTo(map)
+      .bindPopup("Tu ubicación actual").openPopup();
+
+    actualizarPosicion(lat, lng);
+
+    map.on("click", (e) => {
+      const { lat, lng } = e.latlng;
+
+      if (selectedMarker) {
+        map.removeLayer(selectedMarker);
+      }
+      selectedMarker = L.marker([lat, lng], { draggable: true }).addTo(map)
+        .bindPopup("Ubicación del delito").openPopup();
+
+      document.getElementById("lat").value = lat.toFixed(6);
+      document.getElementById("lng").value = lng.toFixed(6);
+    });
+
+    delitos.forEach((d) => {
+      L.marker([+d.lat, +d.lng]).addTo(map)
+        .bindPopup(`
+          <strong>${d.tipo}</strong><br>
+          ${d.descripcion}<br>
+          <em>${d.nombre}, ${d.edad} años, ${d.sexo}</em><br>
+          <small>${d.fechaHora}</small>
+        `);
+      agregarDelitoALista(d);
+    });
+  }
+
+  if ("geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      pos => iniciarMapa(pos.coords.latitude, pos.coords.longitude),
+      () => iniciarMapa(19.4326, -99.1332) // CDMX por defecto
+    );
+  } else {
+    iniciarMapa(19.4326, -99.1332);
+  }
+
+  function agregarDelitoALista(delito) {
+    const lista = document.getElementById("listaDelitos");
+    const li = document.createElement("li");
+
+    li.innerHTML = `
+      <strong>${delito.tipo}</strong>: ${delito.descripcion}<br>
+      <small><em>${delito.nombre}, ${delito.edad} años, ${delito.sexo}</em></small><br>
+      <small>Ubicación: ${parseFloat(delito.lat).toFixed(5)}, ${parseFloat(delito.lng).toFixed(5)}</small><br>
+      <small>Fecha: ${delito.fechaHora}</small>
+    `;
+    lista.appendChild(li);
+  }
+
+  document.getElementById("crimeForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const nombre = document.getElementById("nombre").value.trim();
+    const edad = document.getElementById("edad").value.trim();
+    const sexo = document.getElementById("sexo").value;
+    let tipo = document.getElementById("tipo").value;
+    const descripcion = document.getElementById("descripcion").value.trim();
+    const lat = document.getElementById("lat").value;
+    const lng = document.getElementById("lng").value;
+
+        if (tipo === "Otro") {
+      const otroDelito = document.getElementById("otroDelito").value.trim();
+      if (otroDelito === "") {
+        alert("Por favor, especifica el otro delito.");
+        return;
+      }
+      tipo = otroDelito;
+    }
+
+    if (!lat || !lng) {
+      alert("Por favor, selecciona la ubicación del delito haciendo clic en el mapa.");
+      return;
+    }
+
+    const fechaHora = new Date().toLocaleString();
+
+    const nuevoDelito = {
+      nombre,
+      edad,
+      sexo,
+      tipo,
+      descripcion,
+      lat,
+      lng,
+      fechaHora,
+    };
+
+    delitos.push(nuevoDelito);
+    localStorage.setItem("delitos", JSON.stringify(delitos));
+
+    agregarDelitoALista(nuevoDelito);
+
+    // Agregar marcador al mapa
+    L.marker([+lat, +lng]).addTo(map)
+      .bindPopup(`
+        <strong>${tipo}</strong><br>
+        ${descripcion}<br>
+        <em>${nombre}, ${edad} años, ${sexo}</em><br>
+        <small>${fechaHora}</small>
+      `);
+
+    alert("Delito registrado con éxito.");
+
+    // Limpiar formulario y marcador de selección
+    document.getElementById("crimeForm").reset();
+    document.getElementById("otroDelitoContainer").style.display = "none";
+    if (selectedMarker) {
+      map.removeLayer(selectedMarker);
+      selectedMarker = null;
+    }
+    document.getElementById("lat").value = "";
+    document.getElementById("lng").value = "";
+  });
+
+  function mostrarOtroDelito(valor) {
+    const container = document.getElementById("otroDelitoContainer");
+    if (valor === "Otro") {
+      container.style.display = "block";
+      document.getElementById("otroDelito").required = true;
+    } else {
+      container.style.display = "none";
+      document.getElementById("otroDelito").required = false;
+      document.getElementById("otroDelito").value = "";
+    }
+  }
+
+  function limpiarDelitos() {
+    if (confirm("¿Estás seguro de borrar todos los delitos?")) {
+      delitos = [];
+      localStorage.removeItem("delitos");
+      document.getElementById("listaDelitos").innerHTML = "";
+      // Remover todos los marcadores excepto el marcador de usuario y seleccionado
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker && layer !== userMarker && layer !== selectedMarker) {
+          map.removeLayer(layer);
+        }
+      });
+      alert("Todos los delitos han sido borrados.");
+    }
+  }
+
+  function toggleSeguimiento() {
+    const btn = document.getElementById("toggleSeguimiento");
+    if (seguimientoActivo) {
+      navigator.geolocation.clearWatch(watchId);
+      seguimientoActivo = false;
+      btn.textContent = "🔵 Activar seguimiento";
+      btn.classList.remove("seguimiento-activo");
+    } else {
+      if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            userMarker.setLatLng([latitude, longitude]);
+            map.setView([latitude, longitude], map.getZoom());
+            actualizarPosicion(latitude, longitude);
+          },
+          (err) => alert("Error al activar seguimiento: " + err.message),
+          { enableHighAccuracy: true }
+        );
+        seguimientoActivo = true;
+        btn.textContent = "🟠 Desactivar seguimiento";
+        btn.classList.add("seguimiento-activo");
+      } else {
+        alert("Geolocalización no soportada en este navegador.");
+      }
+    }
+  }
+
+  // Quitar preloader cuando la página esté lista
+  window.addEventListener("load", () => {
+    const preloader = document.getElementById("preloader");
+    preloader.style.display = "none";
+  });
+</script>
+</body>
+</html>
+
